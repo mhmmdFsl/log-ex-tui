@@ -1,0 +1,18 @@
+# Rust build artifacts
+/target
+
+# Local debug logs (if ever written near the repo)
+*.log
+
+# Environment / credential files — never commit GCP service-account keys or ADC files
+.env
+.env.*
+*.json.key
+*credentials*.json
+
+# IDE / OS droppings
+.idea/
+.vscode/
+.DS_Store
+AGENTS.md
+.antigravitycli/

@@ -1,0 +1,52 @@
+[package]
+name = "log-ex-tui"
+version = "0.1.0"
+edition = "2021"
+description = "k9s-style TUI for GCP Cloud Logging"
+license = "MIT"
+repository = "https://github.com/mhmmdFsl/log-ex-tui"
+homepage = "https://github.com/mhmmdFsl/log-ex-tui"
+keywords = ["gcp", "google-cloud", "logging", "tui", "ratatui"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+ratatui              = { version = "0.28", features = ["crossterm"] }
+crossterm            = "0.27"
+tokio                = { version = "1", features = ["full"] }
+tokio-stream         = "0.1"
+clap                 = { version = "4", features = ["derive", "env"] }
+anyhow               = "1"
+thiserror            = "1"
+serde                = { version = "1", features = ["derive"] }
+serde_json           = "1"
+chrono               = { version = "0.4", features = ["serde"] }
+reqwest              = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tracing              = "0.1"
+tracing-subscriber   = { version = "0.3", features = ["env-filter", "json"] }
+dirs                = "5"
+tui-input            = "0.10"
+unicode-width        = "0.2"
+humantime            = "2"
+jsonwebtoken         = "9"
+
+[dependencies.tonic]
+version = "0.12"
+features = ["tls", "tls-roots"]
+
+[dependencies.prost]
+version = "0.13"
+
+[dependencies.prost-types]
+version = "0.13"
+
+[dependencies.google-cloud-logging-v2]
+version = "1"
+features = ["default-rustls-provider"]
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip = "symbols"
+codegen-units = 1
+lto = true
