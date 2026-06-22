@@ -97,6 +97,21 @@ impl LogEntry {
         let summary = truncate_for_display(&summary, max_len);
         format!("{time} {sev} {summary}")
     }
+
+    /// Returns the full text of the currently displayed payload.
+    /// Priority matches the detail renderer: textPayload, jsonPayload, protoPayload.
+    pub fn payload_text(&self) -> Option<String> {
+        if let Some(text) = &self.text_payload {
+            return Some(text.clone());
+        }
+        if let Some(json) = &self.json_payload {
+            return serde_json::to_string(json).ok();
+        }
+        if let Some(proto) = &self.proto_payload {
+            return serde_json::to_string(proto).ok();
+        }
+        None
+    }
 }
 
 fn truncate_for_display(input: &str, max_chars: usize) -> String {
@@ -215,6 +230,36 @@ mod tests {
         let entry: LogEntry = serde_json::from_str(json).expect("deserialize LogEntry");
         assert_eq!(entry.text_payload.as_deref().unwrap(), "hello from text");
         assert_eq!(entry.display_summary(), "gce_instance  hello from text");
+    }
+
+    #[test]
+    fn payload_text_prioritizes_text_then_json_then_proto() {
+        let text_entry = LogEntry {
+            text_payload: Some("text only".into()),
+            json_payload: Some(serde_json::json!({"msg": "json"})),
+            proto_payload: Some(serde_json::json!({"msg": "proto"})),
+            ..Default::default()
+        };
+        assert_eq!(text_entry.payload_text().unwrap(), "text only");
+
+        let json_entry = LogEntry {
+            text_payload: None,
+            json_payload: Some(serde_json::json!({"msg": "json"})),
+            proto_payload: Some(serde_json::json!({"msg": "proto"})),
+            ..Default::default()
+        };
+        assert_eq!(json_entry.payload_text().unwrap(), r#"{"msg":"json"}"#);
+
+        let proto_entry = LogEntry {
+            text_payload: None,
+            json_payload: None,
+            proto_payload: Some(serde_json::json!({"msg": "proto"})),
+            ..Default::default()
+        };
+        assert_eq!(proto_entry.payload_text().unwrap(), r#"{"msg":"proto"}"#);
+
+        let empty = LogEntry::default();
+        assert!(empty.payload_text().is_none());
     }
 }
 

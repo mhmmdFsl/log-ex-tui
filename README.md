@@ -199,10 +199,26 @@ Notes:
 - The in-memory entry list is capped at 10,000 rows.
 - Saved filters persist time range, severities, free-text search, and raw query state.
 
+### Detail View
+
+When viewing a log entry’s details, the following keys are available:
+
+| Key          | Action                                                            |
+| ------------ | ----------------------------------------------------------------- |
+| `j` / `↓`    | Scroll down                                                       |
+| `k` / `↑`    | Scroll up                                                         |
+| `g`          | Jump to top of detail                                             |
+| `G`          | Jump to bottom of detail                                          |
+| `Ctrl+d`     | Scroll down half a page                                           |
+| `Ctrl+u`     | Scroll up half a page                                             |
+| `c`          | Copy the visible payload (`textPayload`, `jsonPayload`, or `protoPayload`) to the system clipboard |
+| `Esc` / `h`  | Back to list view                                                 |
+
+The copied payload is placed on the system clipboard as-is: `textPayload` is copied as plain text, while `jsonPayload` and `protoPayload` are copied as compact JSON. A status message confirms the copy for a few seconds.
+
 ## Limitations
 
 - Tailing is REST polling, not streaming RPC.
-- Some UI actions such as copy/export are still placeholders.
 
 ## Security
 

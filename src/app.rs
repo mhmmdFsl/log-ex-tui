@@ -6,6 +6,7 @@ use ratatui::widgets::{
     Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap,
 };
 use ratatui::Frame;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 use crate::config::Config;
@@ -33,6 +34,7 @@ pub enum Message {
     ProjectsLoaded(Vec<String>),
     EntriesFetched(Vec<LogEntry>),
     TailEntries(Vec<LogEntry>),
+    SetStatus(String),
 }
 
 #[derive(Debug, Default)]
@@ -172,6 +174,7 @@ pub struct App {
     pub detail_scroll: usize,
     pub tail_on: bool,
     pub status: String,
+    pub status_until: Option<Instant>,
     pub error: Option<String>,
 
     pub show_help: bool,
@@ -204,6 +207,7 @@ impl App {
             detail_scroll: 0,
             tail_on: false,
             status: String::new(),
+            status_until: None,
             error: None,
             show_help: false,
             show_project_picker: false,
@@ -227,7 +231,15 @@ impl App {
     pub fn update(&mut self, msg: Message) {
         match msg {
             Message::Key { code, modifiers } => self.handle_key(code, modifiers),
-            Message::Tick => {}
+            Message::Tick => {
+                if let Some(until) = self.status_until {
+                    if Instant::now() >= until {
+                        self.status.clear();
+                        self.status_until = None;
+                    }
+                }
+            }
+            Message::SetStatus(text) => self.set_status(text, Duration::from_secs(3)),
             Message::Resize => {}
             Message::GcpReady(client) => {
                 self.gcp = Some(client);
@@ -284,6 +296,11 @@ impl App {
                 self.detail_scroll = 0;
             }
         }
+    }
+
+    fn set_status(&mut self, msg: impl Into<String>, duration: Duration) {
+        self.status = msg.into();
+        self.status_until = Some(Instant::now() + duration);
     }
 
     fn maybe_fetch_entries(&mut self) {
@@ -393,6 +410,32 @@ impl App {
         }
     }
 
+    fn copy_selected_payload(&self) {
+        let Some(entry) = self.entries.get(self.selected) else {
+            let _ = self
+                .command_tx
+                .send(Message::SetStatus("no entry selected".into()));
+            return;
+        };
+        let Some(text) = entry.payload_text() else {
+            let _ = self
+                .command_tx
+                .send(Message::SetStatus("no payload to copy".into()));
+            return;
+        };
+
+        let tx = self.command_tx.clone();
+        tokio::task::spawn_blocking(move || {
+            let result =
+                arboard::Clipboard::new().and_then(|mut clipboard| clipboard.set_text(text));
+            let msg = match result {
+                Ok(()) => "copied payload to clipboard".to_string(),
+                Err(e) => format!("copy failed: {e}"),
+            };
+            let _ = tx.send(Message::SetStatus(msg));
+        });
+    }
+
     fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) {
         if self.show_help {
             if matches!(code, KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('?')) {
@@ -437,6 +480,10 @@ impl App {
 
         if self.focus == Focus::Detail {
             match (code, modifiers) {
+                (KeyCode::Char('c'), KeyModifiers::NONE) => {
+                    self.copy_selected_payload();
+                    return;
+                }
                 (KeyCode::Char('j'), _) | (KeyCode::Down, _) => {
                     self.detail_scroll = self.detail_scroll.saturating_add(1);
                     return;
@@ -625,9 +672,6 @@ impl App {
             }
             (KeyCode::Esc | KeyCode::Char('h'), _) => {
                 self.focus = Focus::List;
-            }
-            (KeyCode::Char('c'), _) => {
-                self.status = "  co: copy (not yet implemented)".into();
             }
             (KeyCode::Char('e'), _) => {
                 self.status = "  ex: export (not yet implemented)".into();
@@ -1213,7 +1257,7 @@ impl App {
                     " 0-8 sev  ·  j/↓ k/↑  ·  : cmd  ·  / search  ·  ↵ view  ·  t tail  ·  T time  ·  ? help  ·  ⇥ focus"
                 }
                 Focus::Detail => {
-                    " j/↓ k/↑ scroll  ·  g/G top/bot  ·  ⌃d/⌃u half-page  ·  esc back  ·  ? help"
+                    " j/↓ k/↑ scroll  ·  g/G top/bot  ·  ⌃d/⌃u half-page  ·  c copy  ·  esc back  ·  ? help"
                 }
             }
         };
@@ -1276,6 +1320,7 @@ impl App {
             Line::from(Span::raw(
                 " l/Enter      Show entry detail       j/k/⌃d/⌃u  Scroll detail",
             )),
+            Line::from(Span::raw(" c            Copy payload")),
             Line::from(Span::raw(" ↑ / ↓        Select palette suggestion")),
             Line::from(Span::raw(" 0-8          Toggle severity")),
             Line::from(Span::raw(" T            Cycle time range")),
